@@ -20,13 +20,12 @@ The project includes all state-of-the-art methods such as the local basis funcio
   
 ## Already implemented   
   
-* First implementation of ARX model  
+* First implementation of ARX, AR and FIR models  
 * Basic signal processing tools   
   
 ## TODO  
 ### Models
 * Volterra series models
-* FIR and AR models
 * Polynomial NARX models
 ### Identification methods
 * Kalman filter-based

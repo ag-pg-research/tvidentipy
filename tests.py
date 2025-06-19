@@ -1,9 +1,10 @@
+import unittest
 import numpy as np
 import signal_tools as sig
 import tv_models as models
 
 
-class TestTools:
+class TestTools(unittest.TestCase):
     N = 501
 
     def test_binomial_func(self):
@@ -74,7 +75,7 @@ class TestTools:
         assert np.max(np.abs(rz[:30] - tr[:30])) < 5e-02
 
 
-class TestModels:
+class TestModels(unittest.TestCase):
 
     def test_ARX_stability(self):
         a_st = np.array([[0.2, 0.1],
@@ -87,3 +88,22 @@ class TestModels:
         ind_unst = models.ARX.check_stability(a_unst)
         assert models.ARX.check_stability(a_st)
         assert ind_unst[0] == 1
+
+    def test_ARX_regressors(self):
+        model_arx = models.ARX(2, (1, 2))
+        model_ar = models.ARX(2, 0)
+        model_fir = models.ARX(0, (1, 2))
+        y = np.array([1, 2, 3, 4, 5])
+        u = np.array([[-1, 0.1], [-2, 0.2], [-3, 0.3], [-4, 0.4], [-5, 0.5], [-6, 0.6]])
+        Phi_arx = model_arx.regression_vectors(y, u)
+        Phi_ar = model_ar.regression_vectors(y, u)
+        Phi_fir = model_fir.regression_vectors(y, u)
+
+        oracle_arx = np.array([[0, 0, -1, 0.1, 0], [1, 0, -2, 0.2, 0.1],
+                               [2, 1, -3, 0.3, 0.2], [3, 2, -4, 0.4, 0.3], [4, 3, -5, 0.5, 0.4]])
+        oracle_ar = np.array([[0, 0], [1, 0], [2, 1], [3, 2], [4, 3]])
+        oracle_fir = np.array([[-1, 0.1, 0], [-2, 0.2, 0.1], [-3, 0.3, 0.2], [-4, 0.4, 0.3], [-5, 0.5, 0.4]])
+
+        assert np.all(Phi_arx == oracle_arx)
+        assert np.all(Phi_ar == oracle_ar)
+        assert np.all(Phi_fir == oracle_fir)
