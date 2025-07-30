@@ -102,8 +102,31 @@ class TestModels(unittest.TestCase):
         oracle_arx = np.array([[0, 0, -1, 0.1, 0], [1, 0, -2, 0.2, 0.1],
                                [2, 1, -3, 0.3, 0.2], [3, 2, -4, 0.4, 0.3], [4, 3, -5, 0.5, 0.4]])
         oracle_ar = np.array([[0, 0], [1, 0], [2, 1], [3, 2], [4, 3]])
-        oracle_fir = np.array([[-1, 0.1, 0], [-2, 0.2, 0.1], [-3, 0.3, 0.2], [-4, 0.4, 0.3], [-5, 0.5, 0.4]])
+        oracle_fir = np.array([[-1, 0.1, 0], [-2, 0.2, 0.1], [-3, 0.3, 0.2], [-4, 0.4, 0.3], [-5, 0.5, 0.4], [-6, 0.6, 0.5]])
 
         assert np.all(Phi_arx == oracle_arx)
         assert np.all(Phi_ar == oracle_ar)
         assert np.all(Phi_fir == oracle_fir)
+
+    def test_output_generation(self):
+        model_fir = models.ARX(0, 6)
+        model_ar = models.ARX(1, 0)
+
+        b = np.array([1, 0, 0, -1, 2, 3])
+        b = np.tile(b, (10, 1))
+        u = np.array([[1], [0], [0], [0], [0], [0], [0], [0], [0], [0]])
+
+        a = np.tile([0.9], (10, 1))
+
+        model_fir.set_params(None, b)
+        y_fir = model_fir.generate_output(u, var_e=0)
+
+        model_ar.set_params(a, None)
+        e = np.array([[0], [1], [0], [0], [0], [0], [0], [0], [0], [0]])
+        y_ar = model_ar.generate_output(None, e=e)
+
+        y_fir_oracle = np.concatenate([b[0], np.zeros(4)])
+        y_ar_oracle = np.concatenate([np.zeros(1), 0.9**np.arange(9)])
+
+        assert np.all(y_fir == y_fir_oracle)
+        assert np.all(np.abs(y_ar - y_ar_oracle) < 0.0001)

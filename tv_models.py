@@ -13,30 +13,41 @@ class ARX:
         else:
             self.nu = (nu,)
             self.num_in = 1
-        self.T = 0
-        self.a = []
-        self.b = []
+        self.T = None
+        self.a = None
+        self.b = None
 
-    def set_params(self, a, b):
+    def set_params(self, a=None, b=None):
         """
         :param a: time-varying a parameters (T x ny)
-        :param b: time-varying b parameters for each input (num_in x T x nu)
+        :param b: time-varying b parameters for each input (T x sum(nu))
         :return:
         """
-        dim_a = a.shape
-        Ta = dim_a[0]
-        dim_b = b.shape
-        if len(dim_b) < 2:
-            b = np.reshape(b, (1, dim_b[0], dim_b[1]))
-        Tb = dim_b[1]
-        if dim_b[2] != self.nu:
-            raise Exception("Wrong number of coefficients in b!")
-        elif dim_b[0] != self.num_in:
-            raise Exception("Wrong number of polynomials b!")
+        if a is not None:
+            dim_a = a.shape
+            Ta = dim_a[0]
+        else:
+            Ta = None
+        if b is not None:
+            dim_b = b.shape
+            Tb = dim_b[0]
+            if sum(self.nu) != dim_b[1]:
+                raise Exception("Wrong number of parameters!")
+        else:
+            Tb = None
 
-        self.T = min(Ta, Tb)
-        self.a = a[1:self.T]
-        self.b = b[:, 1:self.T, :]
+        if Ta is not None and Tb is not None:
+            self.T = min(Ta, Tb)
+        elif Ta is None:
+            self.T = Tb
+        elif Tb is None:
+            self.T = Ta
+        else:
+            self.T = None
+        if a is not None:
+            self.a = a[:self.T]
+        if b is not None:
+            self.b = b[:self.T]
 
     @staticmethod
     def check_stability(a):
@@ -66,11 +77,18 @@ class ARX:
         :return: Phi - matrix of regression vectors (T x ny+sum(nu)), first columns contain the outputs, next columns
                         contain inputs
         """
-        Tu, num_in = u.shape
-        if num_in != self.num_in and self.num_in > 0:
-            raise Exception("Number of inputs doesn't match the declared one!")
-        Ty = y.size
-        T = min(Tu, Ty)
+        if self.num_in > 0:
+            Tu, num_in = u.shape
+            if num_in != self.num_in and self.num_in > 0:
+                raise Exception("Number of inputs doesn't match the declared one!")
+        if self.ny > 0:
+            Ty = y.size
+        if self.num_in > 0 and self.ny > 0:
+            T = min(Tu, Ty)
+        elif self.num_in > 0:
+            T = Tu
+        else:
+            T = Ty
         Phi = np.zeros((T, self.ny + np.sum(self.nu)))
         # Adding output signals to regressors
         for i in range(self.ny):
@@ -83,3 +101,29 @@ class ARX:
                 nid += 1
 
         return Phi
+
+    def generate_output(self, u, e=None, var_e=1):
+        if self.T is None:
+            raise Exception('Cannot generate output signals without parameters!')
+
+        if e is not None and len(e) != self.T:
+            raise Exception('Wrong length of the noise sequence!')
+
+        y = np.zeros(self.T)
+        if e is None:
+            e = np.random.randn(self.T)*np.sqrt(var_e)
+
+        if self.num_in > 0:
+            if u.shape[0] != self.T or u.shape[1] != self.num_in:
+                raise Exception('Wrong dimensions of inputs!')
+            input_part = ARX(0, self.nu)
+            Phiu = input_part.regression_vectors(0, u)
+        for t in range(self.ny, self.T):
+            y[t] = e[t]
+            if self.num_in > 0:
+                y[t] += np.dot(Phiu[t], self.b[t])
+
+            if self.ny > 0:
+                y[t] += np.dot(np.fliplr(y[t-self.ny:t]), self.a[t]) if self.ny > 1 else self.a[t]*y[t-self.ny]
+
+        return y
